@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Traderie D2R Assistant",
+  "version": "2.0.0",
+  "description": "Auto-populate Diablo 2 Resurrected item listings on Traderie from screenshots",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "host_permissions": [
+    "https://traderie.com/*",
+    "http://127.0.0.1:8081/*",
+    "http://localhost:8081/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://traderie.com/*"],
+      "js": ["content_script.js"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
+

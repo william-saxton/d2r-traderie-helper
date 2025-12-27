@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traderie D2R Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎮 Traderie D2R Assistant</h1>
+    </header>
+
+    <div class="section">
+      <h2>🔄 Auto-Relist Settings</h2>
+      <div class="form-group">
+        <label for="relistEnabled">
+          <input type="checkbox" id="relistEnabled" />
+          Enable Auto-Relist
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="relistInterval">Relist Interval (minutes):</label>
+        <input type="number" id="relistInterval" min="1" max="1440" value="30" />
+      </div>
+      <div class="form-group">
+        <label for="relistOnlyExpired">
+          <input type="checkbox" id="relistOnlyExpired" checked />
+          Only relist expired items
+        </label>
+      </div>
+      <button id="saveRelistBtn" class="btn btn-secondary">Save Settings</button>
+      <div id="relistStatus" class="status"></div>
+    </div>
+
+    <div class="section">
+      <h2>📊 Stats</h2>
+      <div id="stats">
+        <div class="stat-item">
+          <span class="stat-label">Auto-Relists:</span>
+          <span id="autoRelists">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+

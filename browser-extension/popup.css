@@ -1,0 +1,161 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 400px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+  color: #e0e0e0;
+}
+
+.container {
+  padding: 16px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #3a3a4e;
+}
+
+h1 {
+  font-size: 20px;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+h2 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: #c9a961;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section {
+  background: rgba(42, 42, 62, 0.5);
+  border: 1px solid #3a3a4e;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #4a4a6e;
+  color: #e0e0e0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #5a5a7e;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 74, 110, 0.4);
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #b0b0c0;
+}
+
+.form-group input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 8px;
+  background: #2a2a3e;
+  border: 1px solid #3a3a4e;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.form-group input[type="number"]:focus {
+  outline: none;
+  border-color: #c9a961;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: center;
+  display: none;
+}
+
+.status.show {
+  display: block;
+}
+
+.status.success {
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid #4caf50;
+  color: #81c784;
+}
+
+.status.error {
+  background: rgba(244, 67, 54, 0.2);
+  border: 1px solid #f44336;
+  color: #e57373;
+}
+
+.status.info {
+  background: rgba(33, 150, 243, 0.2);
+  border: 1px solid #2196f3;
+  color: #64b5f6;
+}
+
+#stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  background: rgba(30, 30, 46, 0.5);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.stat-label {
+  color: #b0b0c0;
+}
+
+#autoRelists {
+  color: #c9a961;
+  font-weight: 600;
+}
+

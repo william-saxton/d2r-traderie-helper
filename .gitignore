@@ -1,0 +1,51 @@
+# Node.js
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Wails / Go
+d2r-traderie-wails/build/bin/
+d2r-traderie-wails/frontend/dist/
+d2r-traderie-wails/frontend/node_modules/
+d2r-traderie-wails/frontend/.svelte-kit/
+d2r-traderie-wails/frontend/.env
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+go.work
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Extension packaging
+*.zip
+*.crx
+*.pem
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
