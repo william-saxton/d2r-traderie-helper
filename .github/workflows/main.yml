@@ -1,10 +1,12 @@
-name: Release
-
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
-  workflow_dispatch:
+  workflow_dispatch: {}
+
+name: Release
 
 jobs:
   build-wails:
