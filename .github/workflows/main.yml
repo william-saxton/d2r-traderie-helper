@@ -52,16 +52,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Zip Extension
+      - name: Prepare Extension
         run: |
-          cd browser-extension
-          zip -r ../traderie-d2r-assistant-extension.zip . -x "*.git*" "README.md"
+          mkdir dist-extension
+          cp -r browser-extension/* dist-extension/
+          rm -f dist-extension/README.md
+          rm -f dist-extension/icons/README.md
 
       - name: Upload Extension Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: browser-extension-zip
-          path: traderie-d2r-assistant-extension.zip
+          name: traderie-d2r-assistant-extension
+          path: dist-extension/
 
   create-release:
     name: Create GitHub Release
@@ -81,8 +83,9 @@ jobs:
           mkdir release
           # Copy everything from wails-windows-amd64 artifact (installer and exe)
           cp artifacts/wails-windows-amd64/* release/
-          # Copy the extension zip
-          cp artifacts/browser-extension-zip/*.zip release/
+          # Zip the extension for release
+          cd artifacts/traderie-d2r-assistant-extension
+          zip -r ../../release/traderie-d2r-assistant-extension.zip .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

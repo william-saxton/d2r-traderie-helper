@@ -1,0 +1,23 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle (Dark Diablo Style) -->
+  <circle cx="64" cy="64" r="60" fill="#1A1A1A" stroke="#C4A484" stroke-width="4"/>
+  
+  <!-- Outer Glow/Ring -->
+  <circle cx="64" cy="64" r="54" stroke="#8B0000" stroke-width="2" stroke-dasharray="4 2"/>
+  
+  <!-- Stylized "T" for Traderie with a gothic feel -->
+  <path d="M40 40H88V50H69V90H59V50H40V40Z" fill="#D4AF37" />
+  
+  <!-- "D2R" Accent (Simplified Rune-like shapes) -->
+  <path d="M50 95L64 105L78 95" stroke="#C4A484" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Little red gem at the bottom -->
+  <path d="M64 98L67 101L64 104L61 101L64 98Z" fill="#FF0000" stroke="#8B0000" stroke-width="1"/>
+  
+  <!-- Decorative Corners -->
+  <path d="M30 30L40 30M30 30L30 40" stroke="#C4A484" stroke-width="2"/>
+  <path d="M98 30L88 30M98 30L98 40" stroke="#C4A484" stroke-width="2"/>
+  <path d="M30 98L40 98M30 98L30 88" stroke="#C4A484" stroke-width="2"/>
+  <path d="M98 98L88 98M98 98L98 88" stroke="#C4A484" stroke-width="2"/>
+</svg>
+
