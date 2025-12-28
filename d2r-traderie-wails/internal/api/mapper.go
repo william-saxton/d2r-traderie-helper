@@ -185,49 +185,56 @@ func (pm *PropertyMapper) MapItemToTraderie(
 	// 5. Pricing (match curl example)
 	// For D2R, the 'items' array should contain the items you WANT (your price)
 	if !makeOffer && len(prices) > 0 {
-		firstGroup := prices[0]
-		for _, pItem := range firstGroup.Items {
-			// Find metadata for this price item from our global list
-			var otMetadata *traderie.TraderieItem
-			if itemList != nil {
-				for i := range itemList.Items {
-					if itemList.Items[i].ID == pItem.Item {
-						otMetadata = &itemList.Items[i]
-						break
+		// Process all price groups (for OR pricing)
+		itemIndex := 0
+		for groupIdx, priceGroup := range prices {
+			for _, pItem := range priceGroup.Items {
+				// Find metadata for this price item from our global list
+				var otMetadata *traderie.TraderieItem
+				if itemList != nil {
+					for i := range itemList.Items {
+						if itemList.Items[i].ID == pItem.Item {
+							otMetadata = &itemList.Items[i]
+							break
+						}
 					}
 				}
-			}
 
-			if otMetadata == nil {
-				// Fallback: Use the item ID as label if not found in list
+				if otMetadata == nil {
+					// Fallback: Use the item ID as label if not found in list
+					traderieListing.Items = append(traderieListing.Items, models.TraderieListingItem{
+						Quantity:   pItem.Quantity,
+						Value:      pItem.Item,
+						Label:      pItem.Item,
+						Properties: []interface{}{},
+						Index:      itemIndex,
+						Group:      groupIdx,
+					})
+					itemIndex++
+					continue
+				}
+
+				// Convert metadata properties to full objects for validation
+				var props []interface{}
+				for _, p := range otMetadata.Properties {
+					props = append(props, p)
+				}
+
+				// Add requested PRICE item to the items list
 				traderieListing.Items = append(traderieListing.Items, models.TraderieListingItem{
 					Quantity:   pItem.Quantity,
-					Value:      pItem.Item,
-					Label:      pItem.Item,
-					Properties: []interface{}{},
+					Diy:        false,
+					CanCatalog: false,
+					Properties: props,
+					Value:      otMetadata.ID, // Correctly set to price item's ID
+					Label:      otMetadata.Name,
+					ImgURL:     otMetadata.Img,
+					Index:      itemIndex,
+					Group:      groupIdx, // Each OR group gets a different group number
+					OfferProps: []string{},
 				})
-				continue
+				itemIndex++
 			}
-
-			// Convert metadata properties to full objects for validation
-			var props []interface{}
-			for _, p := range otMetadata.Properties {
-				props = append(props, p)
-			}
-
-			// Add requested PRICE item to the items list
-			traderieListing.Items = append(traderieListing.Items, models.TraderieListingItem{
-				Quantity:   pItem.Quantity,
-				Diy:        false,
-				CanCatalog: false,
-				Properties: props,
-				Value:      otMetadata.ID, // Correctly set to price item's ID
-				Label:      otMetadata.Name,
-				ImgURL:     otMetadata.Img,
-				Index:      0,
-				Group:      0,
-				OfferProps: []string{},
-			})
 		}
 
 		// Ensure top-level items array is populated and currencyGroupPrices is empty

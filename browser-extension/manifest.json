@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Traderie D2R Assistant",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Auto-populate Diablo 2 Resurrected item listings on Traderie from screenshots",
   "permissions": [
     "storage",
-    "alarms"
+    "alarms",
+    "cookies",
+    "scripting"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

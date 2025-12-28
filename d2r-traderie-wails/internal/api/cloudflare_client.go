@@ -51,9 +51,9 @@ func (c *CloudflareClient) PostItem(item *models.Item, tItem *traderie.TraderieI
 	}
 
 	// Queue the command for the extension
+	// Note: auth is no longer needed as the extension extracts JWT from browser localStorage
 	payload := map[string]interface{}{
 		"item":    traderieItem,
-		"auth":    c.apiKey,
 		"baseURL": c.baseURL,
 	}
 	cmdID := c.bridge.AddCommand("post_listing", payload)
