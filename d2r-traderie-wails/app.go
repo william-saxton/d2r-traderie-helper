@@ -159,6 +159,23 @@ func (a *App) shutdown(ctx context.Context) {
 	log.Println("Application shut down")
 }
 
+// getUniqueItemNameMapping returns the correct Traderie name for items where d2go name differs
+func getUniqueItemNameMapping(d2goName string) string {
+	// Map of d2go unique item names to Traderie names (case-insensitive)
+	mappings := map[string]string{
+		"death's fathom":  "Death's Fathom",
+		"deaths fathom":   "Death's Fathom",
+		"death fathom":    "Death's Fathom",
+		// Add more mappings here as issues are discovered
+	}
+	
+	normalized := strings.ToLower(strings.TrimSpace(d2goName))
+	if traderieName, ok := mappings[normalized]; ok {
+		return traderieName
+	}
+	return ""
+}
+
 // FindTraderieItem finds a matching Traderie item using name, type, and fuzzy matching
 func (a *App) FindTraderieItem(item *models.Item) (*traderie.TraderieItem, bool) {
 	if a.itemList == nil || len(a.itemList.Items) == 0 {
@@ -168,6 +185,14 @@ func (a *App) FindTraderieItem(item *models.Item) (*traderie.TraderieItem, bool)
 
 	itemName := item.Name
 	itemType := item.Type
+	
+	// Check for known unique item name mappings
+	if item.Quality == "Unique" || item.Quality == "Set" {
+		if mappedName := getUniqueItemNameMapping(itemName); mappedName != "" {
+			log.Printf("🔄 Applying name mapping: '%s' → '%s'", itemName, mappedName)
+			itemName = mappedName
+		}
+	}
 
 	// Special case: Rainbow Facet
 	if strings.Contains(strings.ToLower(itemName), "rainbow facet") {
@@ -203,20 +228,63 @@ func (a *App) FindTraderieItem(item *models.Item) (*traderie.TraderieItem, bool)
 		}
 	}
 
-	// 1. Try exact name match
-	tItem, found := a.itemList.FindItemByName(itemName)
-	if found {
-		log.Printf("✅ Found matching Traderie item by name: %s (ID: %s)", tItem.Name, tItem.ID)
-		return tItem, true
-	}
-
-	// 2. Try exact type match
-	if itemType != "" {
-		log.Printf("⚠ Item '%s' not found, trying fallback to type '%s'", itemName, itemType)
-		tItem, found = a.itemList.FindItemByName(itemType)
+	// For Rare, Magic, or Crafted items, skip name matching and use base type directly
+	// This is because these items have generated names (e.g., "Havoc Jack") but should
+	// search Traderie by their base type (e.g., "Plate Mail")
+	if item.Quality == "Rare" || item.Quality == "Magic" || item.Quality == "Crafted" {
+		searchName := itemType
+		
+		// For crafted items with a detected type, construct the full name
+		// Traderie uses GENERIC types: "Caster Gloves", not "Caster Leather Gloves"
+		// So we need to extract the generic type from the base type
+		if item.Quality == "Crafted" && item.CraftedType != "" {
+			// Extract generic type: "Leather Gloves" -> "Gloves", "Gold Amulet" -> "Amulet"
+			genericType := itemType
+			if idx := strings.LastIndex(itemType, " "); idx != -1 {
+				genericType = itemType[idx+1:]
+			}
+			searchName = fmt.Sprintf("%s %s", item.CraftedType, genericType)
+			log.Printf("🔨 Crafted item detected, searching for: %s (base: %s)", searchName, itemType)
+		} else {
+			log.Printf("🔍 Rare/Magic item detected (%s), searching by base type: %s", item.Quality, itemType)
+		}
+		
+		if searchName != "" {
+			tItem, found := a.itemList.FindItemByName(searchName)
+			if found {
+				log.Printf("✅ Found matching Traderie item: %s (ID: %s)", tItem.Name, tItem.ID)
+				return tItem, true
+			}
+		}
+		
+		// If crafted type search failed, try just the base type as fallback
+		if item.Quality == "Crafted" && item.CraftedType != "" && itemType != "" {
+			log.Printf("⚠ Crafted item '%s' not found, trying base type: %s", searchName, itemType)
+			tItem, found := a.itemList.FindItemByName(itemType)
+			if found {
+				log.Printf("✅ Found matching Traderie item by base type: %s (ID: %s)", tItem.Name, tItem.ID)
+				return tItem, true
+			}
+		}
+		
+		// For rare/magic/crafted items, if type match fails, fall through to fuzzy matching
+		log.Printf("⚠ Type '%s' not found, trying fuzzy match", searchName)
+	} else {
+		// For Unique, Set, Runeword, Normal items - try exact name match first
+		tItem, found := a.itemList.FindItemByName(itemName)
 		if found {
-			log.Printf("✅ Found matching Traderie item by type: %s (ID: %s)", tItem.Name, tItem.ID)
+			log.Printf("✅ Found matching Traderie item by name: %s (ID: %s)", tItem.Name, tItem.ID)
 			return tItem, true
+		}
+
+		// Try exact type match as fallback
+		if itemType != "" {
+			log.Printf("⚠ Item '%s' not found, trying fallback to type '%s'", itemName, itemType)
+			tItem, found = a.itemList.FindItemByName(itemType)
+			if found {
+				log.Printf("✅ Found matching Traderie item by type: %s (ID: %s)", tItem.Name, tItem.ID)
+				return tItem, true
+			}
 		}
 	}
 
@@ -225,8 +293,33 @@ func (a *App) FindTraderieItem(item *models.Item) (*traderie.TraderieItem, bool)
 	iName := strings.ToLower(itemName)
 	iType := strings.ToLower(itemType)
 
+	// List of crafted item prefixes to exclude from fuzzy matching for non-crafted items
+	craftedPrefixes := []string{"blood ", "caster ", "hit power ", "safety "}
+
 	for i := range a.itemList.Items {
 		tName := strings.ToLower(a.itemList.Items[i].Name)
+
+		// Skip crafted items in fuzzy matching if:
+		// 1. Source is rare/magic (to prevent "Gloves" from matching "Blood Gloves")
+		// 2. Source is crafted but type couldn't be determined (empty CraftedType)
+		//    This prevents unidentified crafted items from fuzzy matching to wrong crafted types
+		shouldSkipCrafted := (item.Quality == "Rare" || item.Quality == "Magic") ||
+			(item.Quality == "Crafted" && item.CraftedType == "")
+
+		if shouldSkipCrafted {
+			isCraftedItem := false
+			for _, prefix := range craftedPrefixes {
+				if strings.HasPrefix(tName, prefix) {
+					isCraftedItem = true
+					break
+				}
+			}
+			if isCraftedItem {
+				log.Printf("⚠️ Skipping crafted item '%s' in fuzzy match (source: %s, craftedType: '%s')", 
+					a.itemList.Items[i].Name, item.Quality, item.CraftedType)
+				continue // Skip this crafted item
+			}
+		}
 
 		// Check if Traderie item name is contained in the item name or vice versa
 		// Skip very short names to avoid noise (e.g. "Amu" matching "Amulet")

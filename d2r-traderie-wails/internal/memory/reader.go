@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"log"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -129,13 +130,31 @@ func (r *Reader) parseItem(d2item *data.Item) *models.Item {
 		log.Printf("DEBUG: Using base name: %s (%s)", itemName, quality)
 	}
 
+	// Detect crafted item type if applicable
+	craftedType := ""
+	if quality == "Crafted" {
+		craftedType = r.detectCraftedType(d2item)
+		if craftedType != "" {
+			log.Printf("🔨 Detected crafted type: %s", craftedType)
+		} else {
+			log.Printf("⚠️ Could not determine crafted type for item")
+		}
+	}
+
+	// Count sockets
+	socketCount := len(d2item.Sockets)
+	if socketCount > 0 {
+		log.Printf("🔌 Detected %d socket(s) in item", socketCount)
+	}
+
 	item := &models.Item{
-		Name:       itemName,
-		Type:       r.getItemType(d2item),
-		Quality:    quality,
-		Properties: r.parseProperties(d2item),
-		Sockets:    len(d2item.Sockets),
-		IsEthereal: d2item.Ethereal,
+		Name:        itemName,
+		Type:        r.getItemType(d2item),
+		Quality:     quality,
+		CraftedType: craftedType,
+		Properties:  r.parseProperties(d2item),
+		Sockets:     socketCount,
+		IsEthereal:  d2item.Ethereal,
 		IsIdentified: d2item.Identified,
 	}
 
@@ -144,14 +163,152 @@ func (r *Reader) parseItem(d2item *data.Item) *models.Item {
 
 // getItemType determines the item type category
 func (r *Reader) getItemType(item *data.Item) string {
-	itemType := item.Type()
+	// For Traderie matching, we need the full base item name like "Leather Gloves"
+	// The item.Name field contains this but without spaces (e.g., "LeatherGloves")
+	baseName := string(item.Name)
 	
-	// Return the type name from d2go
+	// Add spaces before capital letters to match Traderie format
+	// "LeatherGloves" -> "Leather Gloves"
+	// "ChainMail" -> "Chain Mail"
+	spacedName := addSpacesToCamelCase(baseName)
+	
+	if spacedName != "" {
+		return spacedName
+	}
+	
+	// Fallback to itemType if available
+	itemType := item.Type()
+	if itemType.Name != "" {
+		return itemType.Name
+	}
+	
 	if itemType.Code != "" {
 		return itemType.Code
 	}
 	
-	return string(item.Name)
+	// Last resort: return the base name as-is
+	return baseName
+}
+
+// getGenericItemType returns the generic type (e.g., "Gloves", "Amulet", "Ring")
+// This is used for crafted items where Traderie uses generic types like "Caster Gloves"
+func (r *Reader) getGenericItemType(item *data.Item) string {
+	itemType := item.Type()
+	
+	// itemType.Name gives us the generic type like "Gloves", "Amulet", "Ring"
+	if itemType.Name != "" {
+		return itemType.Name
+	}
+	
+	// Fallback: try to extract generic type from base name
+	baseName := string(item.Name)
+	spacedName := addSpacesToCamelCase(baseName)
+	
+	// Extract the last word (e.g., "Leather Gloves" -> "Gloves")
+	if idx := strings.LastIndex(spacedName, " "); idx != -1 {
+		return spacedName[idx+1:]
+	}
+	
+	return spacedName
+}
+
+// addSpacesToCamelCase converts "LeatherGloves" to "Leather Gloves"
+func addSpacesToCamelCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	
+	var result []rune
+	runes := []rune(s)
+	
+	for i, r := range runes {
+		// Add space before capital letter if:
+		// - It's not the first character
+		// - Previous character is lowercase
+		// - Current character is uppercase
+		if i > 0 && r >= 'A' && r <= 'Z' && runes[i-1] >= 'a' && runes[i-1] <= 'z' {
+			result = append(result, ' ')
+		}
+		result = append(result, r)
+	}
+	
+	return string(result)
+}
+
+// detectCraftedType identifies the type of crafted item based on its stats
+// Returns: "Caster", "Blood", "Hit Power", "Safety", or "" if can't determine
+func (r *Reader) detectCraftedType(item *data.Item) string {
+	hasManaRegen := false
+	hasLifeSteal := false
+	hasCrushingBlow := false
+	hasKnockback := false
+	hasAttackerTakesDamage := false
+	hasDamageReduced := false
+	hasMagicDamageReduced := false
+
+	// Check item stats for characteristic properties
+	log.Printf("🔍 Analyzing %d stats for crafted type detection...", len(item.Stats))
+	for _, s := range item.Stats {
+		switch s.ID {
+		case stat.ID(27): // Regenerate Mana % (the actual stat for crafted Caster items)
+			hasManaRegen = true
+			log.Printf("  ✓ Found Mana Regeneration %d%% (stat ID: %d) - indicates CASTER", s.Value, s.ID)
+		case stat.ManaRecovery: // Also check the other mana recovery stat as backup
+			hasManaRegen = true
+			log.Printf("  ✓ Found Mana Recovery (stat ID: %d, value: %d) - indicates CASTER", s.ID, s.Value)
+		case stat.LifeSteal:
+			hasLifeSteal = true
+			log.Printf("  ✓ Found Life Steal %d%% (stat ID: %d) - indicates BLOOD", s.Value, s.ID)
+		case stat.CrushingBlow:
+			hasCrushingBlow = true
+			log.Printf("  ✓ Found Crushing Blow %d%% (stat ID: %d) - indicates BLOOD (gloves)", s.Value, s.ID)
+		case stat.ID(119): // Knockback
+			hasKnockback = true
+			log.Printf("  ✓ Found Knockback (stat ID: %d) - indicates HIT POWER (gloves)", s.ID)
+		case stat.ID(78): // Attacker Takes Damage
+			hasAttackerTakesDamage = true
+			log.Printf("  ✓ Found Attacker Takes Damage %d (stat ID: %d) - indicates HIT POWER", s.Value, s.ID)
+		case stat.DamageReduced:
+			hasDamageReduced = true
+			log.Printf("  ✓ Found Damage Reduced %d (stat ID: %d)", s.Value, s.ID)
+		case stat.MagicDamageReduction:
+			hasMagicDamageReduced = true
+			log.Printf("  ✓ Found Magic Damage Reduced %d (stat ID: %d)", s.Value, s.ID)
+		}
+	}
+
+	// Determine crafted type based on guaranteed stats from D2R crafting recipes
+	// Priority order matters since items can have multiple mods
+	
+	// Caster: ALWAYS has Regenerate Mana 4-10%
+	// Check this first because it's the most reliable indicator
+	if hasManaRegen {
+		return "Caster"
+	}
+	
+	// Safety: ALWAYS has both Damage Reduced AND Magic Damage Reduced
+	// Check this before Blood because this combination is unique to Safety
+	if hasDamageReduced && hasMagicDamageReduced {
+		return "Safety"
+	}
+	
+	// Hit Power: Has Knockback (gloves) OR Attacker Takes Damage (all)
+	// Check this before Blood to avoid confusion with Crushing Blow
+	if hasKnockback || hasAttackerTakesDamage {
+		return "Hit Power"
+	}
+	
+	// Blood: Has Life Stolen per Hit OR Crushing Blow (gloves specific)
+	// Check this last since life steal can appear as random mod
+	if hasLifeSteal || hasCrushingBlow {
+		return "Blood"
+	}
+
+	// If we can't determine, return empty string
+	log.Printf("⚠️ No guaranteed crafted stats found - this may not be a true crafted item or has unusual mods")
+	log.Printf("   Stats: ManaRegen=%v, LifeSteal=%v, CrushingBlow=%v, Knockback=%v, AttackerTakesDmg=%v, DmgReduced=%v, MagicDmgReduced=%v",
+		hasManaRegen, hasLifeSteal, hasCrushingBlow, hasKnockback, hasAttackerTakesDamage, hasDamageReduced, hasMagicDamageReduced)
+	return ""
 }
 
 // parseProperties extracts all properties/stats from the item and formats them for Traderie
@@ -293,12 +450,14 @@ func (r *Reader) mapStatToTraderie(statID int16, value int, layer int) string {
 		stat.LightningResist: "Lightning Resistance",
 		stat.ColdResist:      "Cold Resistance",
 		stat.PoisonResist:    "Poison Resistance",
+		stat.ID(110):         "Poison Length Reduced", // Poison Length Reduced by X%
 		
 		// Life/Mana
 		stat.Life:    "Life",
 		stat.Mana:    "Mana",
 		stat.MaxLife: "Max Life",
 		stat.MaxMana: "Max Mana",
+		stat.ID(138): "Mana after each Kill", // +X to Mana after each Kill
 		
 		// Enhanced Defense
 		stat.EnhancedDefense: "Enhanced Defense",
@@ -337,6 +496,7 @@ func (r *Reader) mapStatToTraderie(statID int16, value int, layer int) string {
 		
 		// Replenish Life/Mana
 		stat.ReplenishLife: "Replenish Life",
+		stat.ID(27):        "Regenerate Mana", // Regenerate Mana % (crafted Caster items)
 		stat.ManaRecovery:  "Regenerate Mana",
 		
 		// Damage Reduction
@@ -354,14 +514,18 @@ func (r *Reader) mapStatToTraderie(statID int16, value int, layer int) string {
 		stat.LifeSteal: "Life Leech",
 		stat.ManaSteal: "Mana Leech",
 		
-		// Open Wounds, Crushing Blow
+		// Open Wounds, Crushing Blow, Knockback
 		stat.OpenWounds:   "Open Wounds",
 		stat.CrushingBlow: "Crushing Blow",
+		stat.ID(119):      "Knockback",
 		
 		// Absorb
 		stat.AbsorbFire:      "Fire Absorb",
 		stat.AbsorbCold:      "Cold Absorb",
 		stat.AbsorbLightning: "Lightning Absorb",
+		
+		// Attacker Takes Damage (Hit Power crafted items)
+		stat.ID(78): "Attacker Takes Damage",
 		
 		// Rainbow Facet Triggers
 		stat.ID(197): "On Death",
@@ -398,6 +562,34 @@ func (r *Reader) mapStatToTraderie(statID int16, value int, layer int) string {
 		classNames := []string{"Amazon", "Sorceress", "Necromancer", "Paladin", "Barbarian", "Druid", "Assassin"}
 		if layer >= 0 && layer < len(classNames) {
 			return fmt.Sprintf("+%d to %s Skill Levels", value, classNames[layer])
+		}
+	}
+	
+	// Handle skill tree bonuses (e.g., +2 to Fire Skills, +2 to Combat Skills)
+	// Stat ID 188 is typically used for skill tab bonuses in D2
+	// Layer indicates the skill tree (0-2 for each class's three trees)
+	if statID == 188 {
+		// Skill tree names by class and tree index
+		// Each class has 3 skill trees (index 0, 1, 2)
+		skillTreeNames := map[int][]string{
+			0: {"Bow and Crossbow Skills", "Passive and Magic Skills", "Javelin and Spear Skills"}, // Amazon
+			1: {"Fire Skills", "Lightning Skills", "Cold Skills"},                                    // Sorceress
+			2: {"Summoning Skills", "Poison and Bone Skills", "Curses"},                             // Necromancer
+			3: {"Combat Skills", "Offensive Auras", "Defensive Auras"},                              // Paladin
+			4: {"Combat Skills", "Masteries", "Warcries"},                                           // Barbarian
+			5: {"Summoning Skills", "Shape Shifting", "Elemental Skills"},                           // Druid
+			6: {"Martial Arts", "Shadow Disciplines", "Traps"},                                      // Assassin
+		}
+		
+		// Layer encodes both class and tree: class*3 + tree
+		// Extract class index and tree index from layer
+		classIndex := layer / 3
+		treeIndex := layer % 3
+		
+		if trees, ok := skillTreeNames[classIndex]; ok && treeIndex < len(trees) {
+			className := []string{"Amazon", "Sorceress", "Necromancer", "Paladin", "Barbarian", "Druid", "Assassin"}[classIndex]
+			treeName := trees[treeIndex]
+			return fmt.Sprintf("to %s (%s Only)", treeName, className)
 		}
 	}
 	

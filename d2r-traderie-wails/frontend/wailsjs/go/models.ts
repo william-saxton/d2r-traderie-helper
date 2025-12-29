@@ -52,6 +52,7 @@ export namespace models {
 	    name: string;
 	    type: string;
 	    quality: string;
+	    crafted_type?: string;
 	    properties: Property[];
 	    requirements?: Requirements;
 	    sockets: number;
@@ -70,6 +71,7 @@ export namespace models {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.quality = source["quality"];
+	        this.crafted_type = source["crafted_type"];
 	        this.properties = this.convertValues(source["properties"], Property);
 	        this.requirements = this.convertValues(source["requirements"], Requirements);
 	        this.sockets = source["sockets"];

@@ -5,6 +5,7 @@ type Item struct {
 	Name         string            `json:"name"`
 	Type         string            `json:"type"`
 	Quality      string            `json:"quality"`      // Normal, Magic, Rare, Unique, Set, Crafted, Rune, Gem
+	CraftedType  string            `json:"crafted_type,omitempty"` // Caster, Blood, Hitpower, Safety (for crafted items only)
 	Properties   []Property        `json:"properties"`
 	Requirements *Requirements     `json:"requirements,omitempty"`
 	Sockets      int               `json:"sockets"`

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/yourusername/d2r-traderie-wails/internal/traderie"
@@ -170,15 +171,22 @@ func (pm *PropertyMapper) MapItemToTraderie(
 	}
 
 	if item.Sockets > 0 {
-		if info := findPropInfo("Sockets"); info != nil && !addedPropIDs[info.PropertyID] {
-			traderieListing.Properties = append(traderieListing.Properties, models.TraderieListingProp{
-				ID:        info.PropertyID,
-				Property:  info.Property,
-				Option:    item.Sockets,
-				Type:      info.Type,
-				Preferred: true,
-			})
-			addedPropIDs[info.PropertyID] = true
+		if info := findPropInfo("Sockets"); info != nil {
+			if !addedPropIDs[info.PropertyID] {
+				traderieListing.Properties = append(traderieListing.Properties, models.TraderieListingProp{
+					ID:        info.PropertyID,
+					Property:  info.Property,
+					Option:    item.Sockets,
+					Type:      info.Type,
+					Preferred: true,
+				})
+				addedPropIDs[info.PropertyID] = true
+				log.Printf("🔌 Added %d socket(s) to Traderie listing (Property ID: %d)", item.Sockets, info.PropertyID)
+			} else {
+				log.Printf("⚠️ Sockets property already added, skipping duplicate")
+			}
+		} else {
+			log.Printf("⚠️ Sockets property not found in Traderie item metadata")
 		}
 	}
 
@@ -460,6 +468,41 @@ func getPropertyMappings() map[string]interface{} {
 			"paladin": "to Conviction (Paladin Only)",
 			"any":     "to Conviction (Any Class)",
 		},
+		
+		// Skill Tree Bonuses - Amazon
+		"Bow and Crossbow Skills (Amazon Only)":   "to Bow and Crossbow Skills (Amazon Only)",
+		"Passive and Magic Skills (Amazon Only)":  "to Passive and Magic Skills (Amazon Only)",
+		"Javelin and Spear Skills (Amazon Only)":  "to Javelin and Spear Skills (Amazon Only)",
+		
+		// Skill Tree Bonuses - Sorceress
+		"Fire Skills (Sorceress Only)":      "to Fire Skills (Sorceress Only)",
+		"Lightning Skills (Sorceress Only)": "to Lightning Skills (Sorceress Only)",
+		"Cold Skills (Sorceress Only)":      "to Cold Skills (Sorceress Only)",
+		
+		// Skill Tree Bonuses - Necromancer
+		"Summoning Skills (Necromancer Only)":    "to Summoning Skills (Necromancer Only)",
+		"Poison and Bone Skills (Necromancer Only)": "to Poison and Bone Skills (Necromancer Only)",
+		"Curses (Necromancer Only)":              "to Curses (Necromancer Only)",
+		
+		// Skill Tree Bonuses - Paladin
+		"Combat Skills (Paladin Only)":     "to Combat Skills (Paladin Only)",
+		"Offensive Auras (Paladin Only)":   "to Offensive Auras (Paladin Only)",
+		"Defensive Auras (Paladin Only)":   "to Defensive Auras (Paladin Only)",
+		
+		// Skill Tree Bonuses - Barbarian
+		"Combat Skills (Barbarian Only)":   "to Combat Skills (Barbarian Only)",
+		"Masteries (Barbarian Only)":       "to Masteries (Barbarian Only)",
+		"Warcries (Barbarian Only)":        "to Warcries (Barbarian Only)",
+		
+		// Skill Tree Bonuses - Druid
+		"Summoning Skills (Druid Only)":    "to Summoning Skills (Druid Only)",
+		"Shape Shifting (Druid Only)":      "to Shape Shifting (Druid Only)",
+		"Elemental Skills (Druid Only)":    "to Elemental Skills (Druid Only)",
+		
+		// Skill Tree Bonuses - Assassin
+		"Martial Arts (Assassin Only)":     "to Martial Arts (Assassin Only)",
+		"Shadow Disciplines (Assassin Only)": "to Shadow Disciplines (Assassin Only)",
+		"Traps (Assassin Only)":            "to Traps (Assassin Only)",
 		
 		// General skill modifiers
 		"All Skills":                "to All Skills",
