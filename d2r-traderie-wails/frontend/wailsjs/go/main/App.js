@@ -14,6 +14,10 @@ export function GetAllItems() {
   return window['go']['main']['App']['GetAllItems']();
 }
 
+export function GetAttachedProcesses() {
+  return window['go']['main']['App']['GetAttachedProcesses']();
+}
+
 export function GetAuthToken() {
   return window['go']['main']['App']['GetAuthToken']();
 }
@@ -40,6 +44,10 @@ export function OpenURLInExtension(arg1) {
 
 export function PostItem(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['PostItem'](arg1, arg2, arg3, arg4);
+}
+
+export function RefreshD2RProcesses() {
+  return window['go']['main']['App']['RefreshD2RProcesses']();
 }
 
 export function RefreshListings() {

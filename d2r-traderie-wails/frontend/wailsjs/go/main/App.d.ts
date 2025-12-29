@@ -9,6 +9,8 @@ export function GenerateSearchURL(arg1:models.Item,arg2:number,arg3:Array<Record
 
 export function GetAllItems():Promise<Array<string>>;
 
+export function GetAttachedProcesses():Promise<Array<Record<string, any>>>;
+
 export function GetAuthToken():Promise<string>;
 
 export function GetCookieSetupInstructions():Promise<string>;
@@ -22,6 +24,8 @@ export function HasSavedCookies():Promise<boolean>;
 export function OpenURLInExtension(arg1:string):Promise<void>;
 
 export function PostItem(arg1:models.Item,arg2:string,arg3:Record<string, any>,arg4:Record<string, any>):Promise<void>;
+
+export function RefreshD2RProcesses():Promise<void>;
 
 export function RefreshListings():Promise<void>;
 

@@ -20,7 +20,7 @@ import (
 // App struct
 type App struct {
 	ctx            context.Context
-	memReader      *memory.Reader
+	processManager *memory.ProcessManager
 	traderieClient interface {
 		PostItem(item *models.Item, tItem *traderie.TraderieItem, platform, mode string, ladder bool, region string, prices []models.CurrencyGroupPrice, manualMappings []map[string]interface{}, makeOffer bool, itemList *traderie.TraderieItemList) error
 		TestConnection() error
@@ -55,21 +55,36 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.config = cfg
 
-	// Initialize memory reader
-	log.Println("Looking for Diablo 2 Resurrected process...")
-	memReader, err := memory.NewReader()
-	if err != nil {
-		errMsg := fmt.Sprintf("❌ Could not connect to D2R: %v\n\nPlease run as Administrator!", err)
-		runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-			Type:    runtime.ErrorDialog,
-			Title:   "D2R Connection Error",
-			Message: errMsg,
+	// Initialize process manager for multi-instance support
+	log.Println("Scanning for Diablo 2 Resurrected processes...")
+	processManager, err := memory.NewProcessManager(func(infos []memory.ProcessInfo) {
+		// Callback for process list updates - emit to frontend
+		processData := make([]map[string]interface{}, len(infos))
+		for i, info := range infos {
+			processData[i] = map[string]interface{}{
+				"pid":        info.PID,
+				"windowName": info.WindowName,
+				"lastSeen":   info.LastSeen.Format("15:04:05"),
+			}
+		}
+		runtime.EventsEmit(a.ctx, "processes-updated", map[string]interface{}{
+			"count":     len(infos),
+			"processes": processData,
 		})
-		log.Println(errMsg)
-		return
+	})
+	if err != nil {
+		log.Printf("⚠️ Process manager initialization: %v", err)
+		log.Println("💡 Process manager will continue monitoring for D2R launches...")
+		log.Println("💡 Make sure D2R is running and you're in-game, and run as Administrator!")
 	}
-	a.memReader = memReader
-	log.Println("✅ Connected to D2R successfully!")
+	a.processManager = processManager
+	
+	processCount := processManager.GetProcessCount()
+	if processCount > 0 {
+		log.Printf("✅ Connected to %d D2R instance(s) successfully!", processCount)
+	} else {
+		log.Println("⚠️ No D2R instances found yet, monitoring for launches...")
+	}
 
 	// Initialize cookie manager
 	a.cookieManager = api.NewCookieManager()
@@ -146,6 +161,28 @@ func (a *App) startup(ctx context.Context) {
 	runtime.EventsEmit(ctx, "backend-ready", map[string]string{
 		"version": "1.4.0-PRICING-FIX",
 	})
+
+	// Emit initial process list after frontend is ready
+	// Small delay to ensure frontend event listeners are set up
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		if a.processManager != nil {
+			infos := a.processManager.GetProcessInfoList()
+			processData := make([]map[string]interface{}, len(infos))
+			for i, info := range infos {
+				processData[i] = map[string]interface{}{
+					"pid":        info.PID,
+					"windowName": info.WindowName,
+					"lastSeen":   info.LastSeen.Format("15:04:05"),
+				}
+			}
+			runtime.EventsEmit(ctx, "processes-updated", map[string]interface{}{
+				"count":     len(infos),
+				"processes": processData,
+			})
+			log.Printf("📡 Emitted initial process list to frontend: %d process(es)", len(infos))
+		}
+	}()
 }
 
 // shutdown is called when the app is shutting down
@@ -153,10 +190,36 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.hotkeyListener != nil {
 		a.hotkeyListener.Stop()
 	}
-	if a.memReader != nil {
-		a.memReader.Close()
+	if a.processManager != nil {
+		a.processManager.Close()
 	}
 	log.Println("Application shut down")
+}
+
+// GetAttachedProcesses returns information about all attached D2R processes
+func (a *App) GetAttachedProcesses() []map[string]interface{} {
+	if a.processManager == nil {
+		return []map[string]interface{}{}
+	}
+
+	infos := a.processManager.GetProcessInfoList()
+	result := make([]map[string]interface{}, len(infos))
+	for i, info := range infos {
+		result[i] = map[string]interface{}{
+			"pid":        info.PID,
+			"windowName": info.WindowName,
+			"lastSeen":   info.LastSeen.Format("15:04:05"),
+		}
+	}
+	return result
+}
+
+// RefreshD2RProcesses manually triggers a process refresh
+func (a *App) RefreshD2RProcesses() error {
+	if a.processManager == nil {
+		return fmt.Errorf("process manager not initialized")
+	}
+	return a.processManager.RefreshProcesses()
 }
 
 // FindTraderieItem finds a matching Traderie item using name, type, and fuzzy matching
@@ -242,21 +305,31 @@ func (a *App) FindTraderieItem(item *models.Item) (*traderie.TraderieItem, bool)
 
 // handleHotkey is called when the hotkey is pressed
 func (a *App) handleHotkey() {
-	// Read item from memory
-	item, err := a.memReader.GetHoveredItem()
+	// Get the reader for the currently active D2R window
+	reader, pid, err := a.processManager.GetActiveProcessReader()
 	if err != nil {
-		log.Printf("Failed to read item: %v", err)
+		log.Printf("Failed to get active D2R process: %v", err)
+		runtime.EventsEmit(a.ctx, "item-scan-error", fmt.Sprintf("No active D2R window: %v", err))
+		return
+	}
+
+	log.Printf("📖 Reading from D2R process PID %d", pid)
+
+	// Read item from memory
+	item, err := reader.GetHoveredItem()
+	if err != nil {
+		log.Printf("Failed to read item from PID %d: %v", pid, err)
 		runtime.EventsEmit(a.ctx, "item-scan-error", err.Error())
 		return
 	}
 
 	if item == nil {
-		log.Println("No item currently hovered or on cursor")
+		log.Printf("No item currently hovered or on cursor in PID %d", pid)
 		runtime.EventsEmit(a.ctx, "item-scan-error", "No item hovered")
 		return
 	}
 
-	log.Printf("✓ Captured item: %s (%s) Type: %s", item.Name, item.Quality, item.Type)
+	log.Printf("✓ Captured item from PID %d: %s (%s) Type: %s", pid, item.Name, item.Quality, item.Type)
 
 	// Find matching traderie item
 	traderieItem, found := a.FindTraderieItem(item)

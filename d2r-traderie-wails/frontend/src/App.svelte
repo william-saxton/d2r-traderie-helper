@@ -15,7 +15,9 @@
     SavePropertyMappings,
     GenerateSearchURL,
     RefreshListings,
-    OpenURLInExtension
+    OpenURLInExtension,
+    GetAttachedProcesses,
+    RefreshD2RProcesses
   } from '../wailsjs/go/main/App';
   import { EventsOn } from '../wailsjs/runtime/runtime';
 
@@ -61,6 +63,11 @@
   let isPosting = false;
   let initialized = false;
   let backendVersion = 'unknown';
+  
+  // Multi-process support
+  let processCount = 0;
+  let processes = [];
+  let showProcessList = false;
   
   // Reactive statements to save options on change
   $: if (initialized && (platform || mode || ladder || region || autoRefreshEnabled || autoRefreshInterval || searchRange)) {
@@ -165,7 +172,36 @@
     EventsOn('item-scan-error', (error) => {
       alert(`Error scanning item: ${error}`);
     });
+    
+    // Listen for process updates
+    EventsOn('processes-updated', (data) => {
+      console.log('Processes updated:', data);
+      if (data) {
+        processCount = data.count || 0;
+        processes = data.processes || [];
+      }
+    });
+    
+    // Load initial process list
+    GetAttachedProcesses().then(procs => {
+      processes = procs || [];
+      processCount = processes.length;
+      console.log(`Loaded ${processCount} D2R process(es)`);
+    }).catch(err => {
+      console.error('Failed to load processes:', err);
+    });
   });
+  
+  async function refreshProcesses() {
+    try {
+      await RefreshD2RProcesses();
+      const procs = await GetAttachedProcesses();
+      processes = procs || [];
+      processCount = processes.length;
+    } catch (err) {
+      alert(`Error refreshing processes: ${err}`);
+    }
+  }
   
   function addPropertyMapping() {
     propertyMappings = [...propertyMappings, { d2rProp: '', traderieProp: '' }];
@@ -381,6 +417,13 @@
   <div class="header">
     <h1>D2R Traderie <span class="version-tag">{backendVersion}</span></h1>
     <div class="header-actions">
+      <div class="process-status" 
+           class:connected={processCount > 0} 
+           class:disconnected={processCount === 0}
+           on:click={() => showProcessList = !showProcessList}
+           title="Click to view details">
+        {processCount === 0 ? '⚠️ No D2R Processes' : processCount === 1 ? '🎮 1 D2R Instance' : `🎮 ${processCount} D2R Instances`}
+      </div>
       <div class="cookie-status" class:has-cookies={hasSavedCookies} class:no-cookies={!hasSavedCookies}>
         {hasSavedCookies ? '✅ Cloudflare Bypass Active' : '⚠️ No Cookies'}
       </div>
@@ -389,6 +432,32 @@
       </button>
     </div>
   </div>
+  
+  {#if showProcessList}
+    <div class="process-list-panel">
+      <div class="process-list-header">
+        <h3>Connected D2R Instances</h3>
+        <button class="btn-close-small" on:click={() => showProcessList = false}>✕</button>
+      </div>
+      <div class="process-list-content">
+        {#if processCount === 0}
+          <p class="no-processes">No D2R processes detected. Make sure D2R is running and you're in-game.</p>
+        {:else}
+          {#each processes as proc}
+            <div class="process-item">
+              <span class="process-pid">PID: {proc.pid}</span>
+              <span class="process-name">{proc.windowName}</span>
+              <span class="process-time">Last seen: {proc.lastSeen}</span>
+            </div>
+          {/each}
+        {/if}
+      </div>
+      <div class="process-list-actions">
+        <button class="btn-refresh" on:click={refreshProcesses}>🔄 Refresh Processes</button>
+      </div>
+      <p class="help">The active D2R window will be scanned when you press F9.</p>
+    </div>
+  {/if}
   
   {#if showSettings}
     <div class="settings-panel">
@@ -726,6 +795,31 @@
     gap: 10px;
   }
   
+  .process-status {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  
+  .process-status:hover {
+    opacity: 0.8;
+  }
+  
+  .process-status.connected {
+    background: #1b5e20;
+    color: #4caf50;
+    border: 1px solid #4caf50;
+  }
+  
+  .process-status.disconnected {
+    background: #4a1414;
+    color: #f44336;
+    border: 1px solid #f44336;
+  }
+  
   .cookie-status {
     padding: 6px 12px;
     border-radius: 4px;
@@ -743,6 +837,111 @@
     background: #4a2c00;
     color: #ff9800;
     border: 1px solid #ff9800;
+  }
+  
+  .process-list-panel {
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 2px solid #4caf50;
+  }
+  
+  .process-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .process-list-header h3 {
+    margin: 0;
+    color: #4caf50;
+    font-size: 16px;
+  }
+  
+  .btn-close-small {
+    background: #d32f2f;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+  }
+  
+  .btn-close-small:hover {
+    background: #b71c1c;
+  }
+  
+  .process-list-content {
+    background: #252525;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 15px;
+    min-height: 50px;
+  }
+  
+  .no-processes {
+    color: #888;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+  }
+  
+  .process-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 10px;
+    background: #1e1e1e;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    border: 1px solid #333;
+  }
+  
+  .process-item:last-child {
+    margin-bottom: 0;
+  }
+  
+  .process-pid {
+    font-family: monospace;
+    color: #4caf50;
+    font-weight: bold;
+    min-width: 80px;
+  }
+  
+  .process-name {
+    flex: 1;
+    color: #ccc;
+  }
+  
+  .process-time {
+    color: #888;
+    font-size: 12px;
+    font-family: monospace;
+  }
+  
+  .process-list-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .btn-refresh {
+    flex: 1;
+    padding: 10px;
+    background: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  
+  .btn-refresh:hover {
+    background: #1976D2;
   }
   
   .btn-settings {
