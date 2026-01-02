@@ -401,6 +401,45 @@ func (r *Reader) mapStatToTraderie(statID int16, value int, layer int) string {
 		}
 	}
 	
+	// Handle skill tree bonuses (+X to Javelin and Spear Skills, etc.)
+	// layer determines which skill tree - matches Traderie's exact format
+	if statID == int16(stat.AddSkillTab) {
+		skillTreeNames := map[int]string{
+			// Amazon skill trees
+			0: "to Bow and Crossbow Skills (Amazon Only)",
+			1: "to Passive and Magic Skills (Amazon Only)",
+			2: "to Javelin and Spear Skills (Amazon Only)",
+			// Sorceress skill trees
+			8:  "to Fire Skills (Sorceress Only)",
+			9:  "to Lightning Skills (Sorceress Only)",
+			10: "to Cold Skills (Sorceress Only)",
+			// Necromancer skill trees
+			16: "to Curses (Necromancer Only)",
+			17: "to Poison and Bone Skills (Necromancer Only)",
+			18: "to Summoning Skills (Necromancer Only)",
+			// Paladin skill trees
+			24: "to Combat Skills (Paladin Only)",
+			25: "to Offensive Auras (Paladin Only)",
+			26: "to Defensive Auras (Paladin Only)",
+			// Barbarian skill trees
+			32: "to Combat Skills (Barbarian Only)",
+			33: "to Masteries (Barbarian Only)",
+			34: "to Warcries (Barbarian Only)",
+			// Druid skill trees
+			40: "to Summoning Skills (Druid Only)",
+			41: "to Shape Shifting Skills (Druid Only)",
+			42: "to Elemental Skills (Druid Only)",
+			// Assassin skill trees
+			48: "to Trap Skills (Assassin Only)",
+			49: "to Shadow Disciplines (Assassin Only)",
+			50: "to Martial Arts (Assassin Only)",
+		}
+		
+		if skillTree, ok := skillTreeNames[layer]; ok {
+			return skillTree
+		}
+	}
+	
 	// For unknown stats, return empty (we'll skip them)
 	return ""
 }

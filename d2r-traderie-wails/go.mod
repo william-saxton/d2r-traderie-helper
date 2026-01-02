@@ -9,7 +9,7 @@ require (
 	golang.org/x/sys v0.30.0
 )
 
-replace github.com/hectorgimenez/d2go => github.com/kwader2k/d2go v0.0.0-20251221085113-0481a1408c62
+replace github.com/hectorgimenez/d2go => github.com/kwader2k/d2go v0.0.0-20251228080657-d31193099721
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
